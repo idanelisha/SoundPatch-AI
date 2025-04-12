@@ -6,6 +6,7 @@ from app.dependencies.auth import get_current_user
 from app.core.exceptions import AuthenticationError
 from app.core.logging import logger
 from pydantic import BaseModel
+from datetime import datetime, UTC
 
 router = APIRouter(
     prefix="/auth",
@@ -22,31 +23,52 @@ except Exception as e:
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class RegisterResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    createdAt: datetime
+
 class LoginRequest(BaseModel):
     id_token: str
 
-@router.post("/register", response_model=Token)
-async def register(user_data: UserCreate):
+@router.post("/register", response_model=RegisterResponse)
+async def register(user_data: RegisterRequest):
     """
-    Register a new user and return a custom token.
+    Register a new user.
     
     Args:
-        user_data: User registration data
+        user_data: User registration data containing name, email, and password
         
     Returns:
-        Token: Custom token for the registered user
+        RegisterResponse: User information including id, name, email, and creation timestamp
         
     Raises:
         HTTPException: If registration fails
     """
     try:
-        # Register user and get custom token
-        user, custom_token = await auth_service.register_user(user_data)
+        # Convert request to UserCreate format
+        user_create = UserCreate(
+            email=user_data.email,
+            full_name=user_data.name,
+            password=user_data.password
+        )
+        
+        # Register user and get user object (ignore the custom token)
+        user, _ = await auth_service.register_user(user_create)
         logger.info("User registered successfully", extra={"user_id": user.id})
         
-        return Token(
-            access_token=custom_token,
-            token_type="bearer"
+        # Convert to response format
+        return RegisterResponse(
+            id=user.id,
+            name=user.full_name,
+            email=user.email,
+            createdAt=user.created_at
         )
         
     except Exception as e:
