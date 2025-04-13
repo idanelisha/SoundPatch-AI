@@ -1,8 +1,12 @@
 import os
 import uuid
 from datetime import datetime, timedelta
+from typing import List, Optional
 from fastapi import UploadFile, HTTPException
-from app.models.file import File, FileType, FileStatus, ZoomUploadRequest
+from app.models.file import (
+    File, FileType, FileStatus, ZoomUploadRequest,
+    FileListItem, PaginationInfo, FileListResponse
+)
 from app.core.logging import logger
 
 class FileService:
@@ -10,6 +14,8 @@ class FileService:
         self.upload_dir = "uploads"
         if not os.path.exists(self.upload_dir):
             os.makedirs(self.upload_dir)
+        # TODO: Initialize database connection
+        self.files = []  # This should be replaced with actual database storage
 
     def _get_file_type(self, content_type: str) -> FileType:
         if content_type.startswith("audio/"):
@@ -50,6 +56,9 @@ class FileService:
                 expiry_date=expiry_date,
                 transaction_id=transaction_id
             )
+            
+            # TODO: Store in database
+            self.files.append(file_record)
             
             logger.info(
                 "File uploaded successfully",
@@ -111,6 +120,9 @@ class FileService:
                 transaction_id=transaction_id
             )
             
+            # TODO: Store in database
+            self.files.append(file_record)
+            
             # TODO: Implement actual Zoom recording download and processing
             # This is where you would:
             # 1. Download the recording from the Zoom URL
@@ -138,4 +150,99 @@ class FileService:
             raise HTTPException(
                 status_code=500,
                 detail="Failed to process Zoom recording"
+            )
+
+    async def list_files(
+        self,
+        status: Optional[FileStatus] = None,
+        search: Optional[str] = None,
+        page: int = 1,
+        limit: int = 10
+    ) -> FileListResponse:
+        """
+        List files with optional filtering and pagination.
+        
+        Args:
+            status: Filter by file status
+            search: Search term for file title
+            page: Page number (1-based)
+            limit: Number of items per page
+            
+        Returns:
+            FileListResponse: List of files with pagination info
+        """
+        try:
+            # Generate transaction ID
+            transaction_id = f"tx_get_files_{uuid.uuid4().hex[:8]}"
+            
+            # TODO: Replace with actual database query
+            filtered_files = self.files.copy()
+            
+            # Apply status filter
+            if status:
+                filtered_files = [f for f in filtered_files if f.status == status]
+            
+            # Apply search filter
+            if search:
+                search_lower = search.lower()
+                filtered_files = [
+                    f for f in filtered_files
+                    if search_lower in f.title.lower()
+                ]
+            
+            # Calculate pagination
+            total = len(filtered_files)
+            total_pages = (total + limit - 1) // limit
+            page = max(1, min(page, total_pages))
+            
+            # Get paginated results
+            start_idx = (page - 1) * limit
+            end_idx = start_idx + limit
+            paginated_files = filtered_files[start_idx:end_idx]
+            
+            # Convert to response format
+            file_items = [
+                FileListItem(
+                    id=f.id,
+                    title=f.title,
+                    type=f.type,
+                    status=f.status,
+                    uploadDate=f.upload_date,
+                    expiryDate=f.expiry_date
+                )
+                for f in paginated_files
+            ]
+            
+            pagination_info = PaginationInfo(
+                total=total,
+                page=page,
+                limit=limit,
+                totalPages=total_pages
+            )
+            
+            logger.info(
+                "Files listed successfully",
+                extra={
+                    "total": total,
+                    "page": page,
+                    "limit": limit,
+                    "status": status,
+                    "has_search": bool(search)
+                }
+            )
+            
+            return FileListResponse(
+                files=file_items,
+                pagination=pagination_info,
+                transaction_id=transaction_id
+            )
+            
+        except Exception as e:
+            logger.error(
+                "Failed to list files",
+                extra={"error": str(e)}
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to list files"
             ) 

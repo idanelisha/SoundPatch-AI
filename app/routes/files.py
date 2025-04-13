@@ -1,6 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from app.services.file_service import FileService
-from app.models.file import FileUploadResponse, ZoomUploadRequest
+from app.models.file import (
+    FileUploadResponse, ZoomUploadRequest,
+    FileListResponse, FileStatus
+)
 from app.core.logging import logger
 
 router = APIRouter(
@@ -92,4 +95,42 @@ async def upload_zoom_recording(request: ZoomUploadRequest):
         raise HTTPException(
             status_code=500,
             detail="Failed to process Zoom recording"
+        )
+
+@router.get("", response_model=FileListResponse)
+async def list_files(
+    status: FileStatus = Query(None, description="Filter by file status"),
+    search: str = Query(None, description="Search term for file title"),
+    page: int = Query(1, ge=1, description="Page number (1-based)"),
+    limit: int = Query(10, ge=1, le=100, description="Number of items per page")
+):
+    """
+    List files with optional filtering and pagination.
+    
+    Args:
+        status: Filter by file status
+        search: Search term for file title
+        page: Page number (1-based)
+        limit: Number of items per page
+        
+    Returns:
+        FileListResponse: List of files with pagination info
+        
+    Raises:
+        HTTPException: If listing fails
+    """
+    try:
+        return await file_service.list_files(
+            status=status,
+            search=search,
+            page=page,
+            limit=limit
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error("Failed to list files", extra={"error": str(e)})
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to list files"
         ) 

@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from enum import Enum
 
 class FileType(str, Enum):
@@ -33,4 +33,23 @@ class FileUploadResponse(BaseModel):
 
 class ZoomUploadRequest(BaseModel):
     url: str
-    title: str 
+    title: str
+
+class FileListItem(BaseModel):
+    id: str
+    title: str
+    type: FileType
+    status: FileStatus
+    uploadDate: datetime
+    expiryDate: datetime
+
+class PaginationInfo(BaseModel):
+    total: int
+    page: int
+    limit: int
+    totalPages: int
+
+class FileListResponse(BaseModel):
+    files: List[FileListItem]
+    pagination: PaginationInfo
+    transaction_id: str 
