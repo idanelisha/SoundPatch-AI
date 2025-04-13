@@ -306,9 +306,6 @@ class FileService:
             
             file_record = File.parse_raw(file_data)
             
-            # Generate transaction ID for this operation
-            transaction_id = f"tx_get_file_{uuid.uuid4().hex[:8]}"
-            
             # TODO: Get additional file details from your storage service
             # This is where you would:
             # 1. Get file size from storage
@@ -328,8 +325,7 @@ class FileService:
                 duration="1:23:47",
                 fileSize="345.7 MB",
                 mediaUrl=f"https://storage.example.com/processed-files/{file_id}.mp4",
-                originalMediaUrl=f"https://storage.example.com/original-files/{file_id}.mp4",
-                transaction_id=transaction_id
+                originalMediaUrl=f"https://storage.example.com/original-files/{file_id}.mp4"
             )
             
             logger.info(

@@ -65,4 +65,3 @@ class FileDetails(BaseModel):
     fileSize: Optional[str] = None
     mediaUrl: Optional[str] = None
     originalMediaUrl: Optional[str] = None
-    transaction_id: str 
