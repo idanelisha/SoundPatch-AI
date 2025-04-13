@@ -35,17 +35,7 @@ class RegisterResponse(BaseModel):
     createdAt: datetime
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-class UserResponse(BaseModel):
-    id: str
-    name: str
-    email: str
-
-class LoginResponse(BaseModel):
-    token: str
-    user: UserResponse
+    id_token: str
 
 @router.post("/register", response_model=RegisterResponse)
 async def register(user_data: RegisterRequest):
@@ -88,33 +78,24 @@ async def register(user_data: RegisterRequest):
             detail=str(e)
         )
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=Token)
 async def login(login_data: LoginRequest):
     """
-    Login with email and password.
+    Login with Firebase ID token.
     
     Args:
-        login_data: Login data containing email and password
+        login_data: Login data containing Firebase ID token
         
     Returns:
-        LoginResponse: Contains JWT token and user information
+        Token: Access token for the logged-in user
         
     Raises:
         HTTPException: If login fails
     """
     try:
-        # Authenticate user and get token and user info
-        token, user = await auth_service.login_user(login_data.email, login_data.password)
-        logger.info("User logged in successfully", extra={"user_id": user.id})
-        
-        return LoginResponse(
-            token=token,
-            user=UserResponse(
-                id=user.id,
-                name=user.full_name,
-                email=user.email
-            )
-        )
+        token = await auth_service.login_user(login_data.id_token)
+        logger.info("User logged in successfully")
+        return token
     except Exception as e:
         logger.error("Login failed", extra={"error": str(e)})
         raise HTTPException(

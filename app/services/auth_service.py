@@ -84,47 +84,26 @@ class AuthService:
             logger.error("Failed to register user", extra={"error": str(e)})
             raise AuthenticationError(f"Failed to register user: {str(e)}")
 
-    async def login_user(self, email: str, password: str) -> tuple[str, User]:
-        """
-        Login user with email and password.
-        
-        Args:
-            email: User's email
-            password: User's password
-            
-        Returns:
-            tuple[str, User]: JWT token and user object
-            
-        Raises:
-            AuthenticationError: If login fails
-        """
+    async def login_user(self, custom_token: str) -> Token:
+        """Login user and return access token."""
         try:
-            # Sign in with email and password using Firebase Auth
-            firebase_user = auth.get_user_by_email(email)
+            # For custom tokens, we'll use the token directly as the user ID
+            user_id = custom_token
             
             # Verify user exists in Firestore
-            user_doc = self.db.collection("users").document(firebase_user.uid).get()
+            user_doc = self.db.collection("users").document(user_id).get()
             if not user_doc.exists:
-                logger.error("User not found in Firestore", extra={"user_id": firebase_user.uid})
+                logger.error("User not found in Firestore", extra={"user_id": user_id})
                 raise AuthenticationError("User not found")
             
-            # Create custom token
-            custom_token = auth.create_custom_token(firebase_user.uid)
+            # Create new custom token
+            new_custom_token = auth.create_custom_token(user_id)
             
-            # Get user data
-            user_data = user_doc.to_dict()
-            user = User(
-                id=firebase_user.uid,
-                email=firebase_user.email,
-                full_name=user_data.get("full_name", ""),
-                created_at=user_data.get("created_at", datetime.now(UTC)),
-                is_active=user_data.get("is_active", True),
-                current_transactions=user_data.get("current_transactions", []),
-                upload_history=user_data.get("upload_history", [])
+            logger.info("User logged in successfully", extra={"user_id": user_id})
+            return Token(
+                access_token=new_custom_token,
+                token_type="bearer"
             )
-            
-            logger.info("User logged in successfully", extra={"user_id": firebase_user.uid})
-            return custom_token, user
             
         except AuthenticationError:
             raise
