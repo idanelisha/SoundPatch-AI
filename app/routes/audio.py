@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, UTC
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
+from app.core.config import get_settings
 from app.models.upload import UploadResponse
 from app.models.config import AudioProcessingConfig
 from app.models.user import User
@@ -29,7 +30,8 @@ router = APIRouter(
 config = AudioProcessingConfig()
 try:
     logger.info("Initializing audio routes")
-    audio_service = create_audio_service(config)
+    settings = get_settings()
+    audio_service = create_audio_service(config, settings.storage, settings.redis)
     validation_service = ValidationService(config)
     auth_service = AuthService()
     logger.info("Services initialized successfully")

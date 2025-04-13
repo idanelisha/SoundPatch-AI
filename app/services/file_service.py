@@ -3,19 +3,22 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import UploadFile, HTTPException
+from app.core.config import RedisConfig, StorageConfig
 from app.models.file import (
     File, FileType, FileStatus, ZoomUploadRequest,
     FileListItem, PaginationInfo, FileListResponse
 )
 from app.core.logging import logger
+from app.services.storage_service import StorageService
+from app.services.redis_service import RedisService
+import json
 
 class FileService:
-    def __init__(self):
-        self.upload_dir = "uploads"
-        if not os.path.exists(self.upload_dir):
-            os.makedirs(self.upload_dir)
-        # TODO: Initialize database connection
-        self.files = []  # This should be replaced with actual database storage
+    def __init__(self, storage_config: StorageConfig, redis_config: RedisConfig):
+        self.storage_service = StorageService(storage_config)
+        self.redis_service = RedisService(redis_config)
+        self.files_key = "files"
+        self.transactions_key = "transactions"
 
     def _get_file_type(self, content_type: str) -> FileType:
         if content_type.startswith("audio/"):
@@ -37,11 +40,9 @@ class FileService:
             file_id = f"file_{uuid.uuid4().hex[:8]}"
             transaction_id = f"tx_upload_{uuid.uuid4().hex[:8]}"
             
-            # Save file
-            file_path = os.path.join(self.upload_dir, f"{file_id}_{file.filename}")
-            with open(file_path, "wb") as buffer:
-                content = await file.read()
-                buffer.write(content)
+            # Save file to storage
+            file_path = f"{file_id}_{file.filename}"
+            await self.storage_service.upload_file(file, file_path)
             
             # Create file record
             now = datetime.utcnow()
@@ -57,8 +58,26 @@ class FileService:
                 transaction_id=transaction_id
             )
             
-            # TODO: Store in database
-            self.files.append(file_record)
+            # Save file record to Redis
+            await self.redis_service.hset(
+                self.files_key,
+                file_id,
+                file_record.json()
+            )
+            
+            # Save transaction to Redis
+            transaction_data = {
+                "id": transaction_id,
+                "file_id": file_id,
+                "status": "processing",
+                "created_at": now.isoformat(),
+                "type": "file_upload"
+            }
+            await self.redis_service.hset(
+                self.transactions_key,
+                transaction_id,
+                json.dumps(transaction_data)
+            )
             
             logger.info(
                 "File uploaded successfully",
@@ -120,8 +139,27 @@ class FileService:
                 transaction_id=transaction_id
             )
             
-            # TODO: Store in database
-            self.files.append(file_record)
+            # Save file record to Redis
+            await self.redis_service.hset(
+                self.files_key,
+                file_id,
+                file_record.json()
+            )
+            
+            # Save transaction to Redis
+            transaction_data = {
+                "id": transaction_id,
+                "file_id": file_id,
+                "status": "processing",
+                "created_at": now.isoformat(),
+                "type": "zoom_upload",
+                "url": request.url
+            }
+            await self.redis_service.hset(
+                self.transactions_key,
+                transaction_id,
+                json.dumps(transaction_data)
+            )
             
             # TODO: Implement actual Zoom recording download and processing
             # This is where you would:
@@ -172,30 +210,31 @@ class FileService:
             FileListResponse: List of files with pagination info
         """
         try:
-            # TODO: Replace with actual database query
-            filtered_files = self.files.copy()
+            # Get all files from Redis
+            files_data = await self.redis_service.hgetall(self.files_key)
+            files = [File.parse_raw(data) for data in files_data.values()]
             
             # Apply status filter
             if status:
-                filtered_files = [f for f in filtered_files if f.status == status]
+                files = [f for f in files if f.status == status]
             
             # Apply search filter
             if search:
                 search_lower = search.lower()
-                filtered_files = [
-                    f for f in filtered_files
+                files = [
+                    f for f in files
                     if search_lower in f.title.lower()
                 ]
             
             # Calculate pagination
-            total = len(filtered_files)
+            total = len(files)
             total_pages = (total + limit - 1) // limit
             page = max(1, min(page, total_pages))
             
             # Get paginated results
             start_idx = (page - 1) * limit
             end_idx = start_idx + limit
-            paginated_files = filtered_files[start_idx:end_idx]
+            paginated_files = files[start_idx:end_idx]
             
             # Convert to response format
             file_items = [

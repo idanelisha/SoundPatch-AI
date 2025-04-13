@@ -7,6 +7,7 @@ import numpy as np
 from datetime import datetime, UTC
 from typing import Optional
 import io
+from app.core.config import RedisConfig, StorageConfig
 from app.models.config import AudioProcessingConfig
 from app.core.exceptions import (
     RedisConnectionError,
@@ -19,16 +20,16 @@ from app.core.logging import logger
 from app.services.storage_service import StorageService
 
 class BaseAudioService:
-    def __init__(self, config: AudioProcessingConfig):
+    def __init__(self, config: AudioProcessingConfig, storage_config: StorageConfig, redis_config: RedisConfig):
         self.config = config
         logger.info("Initializing BaseAudioService", extra={"config": config.dict()})
-        self.storage_service = StorageService(config)
+        self.storage_service = StorageService(storage_config)
 
         try:
             self.redis_client = Redis(
-                host=config.redis_host,
-                port=config.redis_port,
-                db=config.redis_db,
+                host=redis_config.host,
+                port=redis_config.port,
+                db=redis_config.db,
                 decode_responses=True  # This ensures we get strings instead of bytes
             )
             logger.info("Successfully initialized Redis client")

@@ -5,6 +5,7 @@ from app.models.file import (
     FileListResponse, FileStatus
 )
 from app.core.logging import logger
+from app.core.config import get_settings   
 
 router = APIRouter(
     prefix="/files",
@@ -13,7 +14,8 @@ router = APIRouter(
 
 # Initialize file service
 try:
-    file_service = FileService()
+    settings = get_settings()
+    file_service = FileService(settings.storage, settings.redis)
     logger.info("File service initialized successfully")
 except Exception as e:
     logger.error("Failed to initialize file service", extra={"error": str(e)})

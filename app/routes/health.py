@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
+from app.core.config import get_settings
 from app.services.service_factory import create_audio_service
 from app.services.auth_service import AuthService
 from app.services.storage_service import StorageService
@@ -13,7 +14,8 @@ router = APIRouter(
 # Initialize services
 try:
     config = AudioProcessingConfig()
-    audio_service = create_audio_service(config)
+    settings = get_settings()
+    audio_service = create_audio_service(config, settings.storage, settings.redis)
     auth_service = AuthService()
     storage_service = StorageService(config)
     logger.info("Services initialized for health check")

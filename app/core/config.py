@@ -1,6 +1,18 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
 import os
+from functools import lru_cache
+
+class StorageConfig(BaseSettings):
+    storage_path: str = "uploads"
+    
+    class Config:
+        case_sensitive = False
+
+class RedisConfig(BaseSettings):
+    host: str = os.getenv("REDIS_HOST", "localhost")
+    port: int = int(os.getenv("REDIS_PORT", 6379))
+    db: int = int(os.getenv("REDIS_DB", 0))
 
 class Settings(BaseSettings):
     # Application Settings
@@ -12,10 +24,19 @@ class Settings(BaseSettings):
     max_upload_size: int = int(os.getenv("MAX_UPLOAD_SIZE", 10485760))
     upload_dir: str = os.getenv("UPLOAD_DIR", "uploads")
 
+    # Redis settings
+    redis: RedisConfig = RedisConfig()
+    
+    # Storage settings
+    storage: StorageConfig = StorageConfig()
+
     class Config:
         env_file = ".env"
         case_sensitive = True
         extra = "allow"  # Allow extra fields from environment variables
 
+@lru_cache()
 def get_settings() -> Settings:
-    return Settings() 
+    return Settings()
+
+settings = get_settings() 
