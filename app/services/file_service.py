@@ -425,4 +425,82 @@ class FileService:
             raise HTTPException(
                 status_code=500,
                 detail="Failed to download file"
+            )
+
+    async def stream_file(self, file_id: str, version: str = "processed", range_header: Optional[str] = None) -> tuple[Optional[bytes], str, int, int, int]:
+        """
+        Stream a file by its ID with support for range requests.
+        
+        Args:
+            file_id: The ID of the file to stream
+            version: The version of the file to stream ("processed" or "original")
+            range_header: The Range header from the request
+            
+        Returns:
+            tuple[Optional[bytes], str, int, int, int]: 
+                - File content chunk
+                - Content type
+                - Start byte
+                - End byte
+                - Total file size
+                
+        Raises:
+            HTTPException: If file not found or streaming fails
+        """
+        try:
+            # Get file record from Redis
+            file_data = await self.redis_service.hget(self.files_key, file_id)
+            if not file_data:
+                raise HTTPException(
+                    status_code=404,
+                    detail="File not found"
+                )
+            
+            file_record = File.parse_raw(file_data)
+            
+            # Determine file path based on version
+            if version == "processed":
+                file_path = f"{file_id}_processed"
+            else:
+                file_path = f"{file_id}_original"
+            
+            # Stream file content from storage
+            content, content_type, start_byte, end_byte = await self.storage_service.stream_file(file_path, range_header)
+            if content is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="File content not found"
+                )
+            
+            # Get total file size
+            total_size = os.path.getsize(os.path.join(self.storage_service.storage_path, file_path))
+            
+            logger.info(
+                "File streaming prepared successfully",
+                extra={
+                    "file_id": file_id,
+                    "version": version,
+                    "type": file_record.type,
+                    "start_byte": start_byte,
+                    "end_byte": end_byte,
+                    "total_size": total_size
+                }
+            )
+            
+            return content, content_type, start_byte, end_byte, total_size
+            
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            logger.error(
+                "Failed to stream file",
+                extra={
+                    "error": str(e),
+                    "file_id": file_id,
+                    "version": version
+                }
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to stream file"
             ) 

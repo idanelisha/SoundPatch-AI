@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Response
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Response, Request
 from app.services.file_service import FileService
 from app.models.file import (
     FileUploadResponse, ZoomUploadRequest,
@@ -198,4 +198,63 @@ async def download_file(
         raise HTTPException(
             status_code=500,
             detail="Failed to download file"
+        )
+
+@router.get("/{file_id}/stream")
+async def stream_file(
+    request: Request,
+    file_id: str,
+    version: str = Query("processed", description="Version of the file to stream (processed or original)")
+):
+    """
+    Stream a file by its ID with support for range requests.
+    
+    Args:
+        request: The FastAPI request object
+        file_id: The ID of the file to stream
+        version: The version of the file to stream (processed or original)
+        
+    Returns:
+        Response: Streaming media with appropriate headers
+        
+    Raises:
+        HTTPException: If file not found or streaming fails
+    """
+    try:
+        # Get range header from request
+        range_header = request.headers.get("Range")
+        
+        # Stream file content
+        content, content_type, start_byte, end_byte, total_size = await file_service.stream_file(
+            file_id,
+            version,
+            range_header
+        )
+        
+        # Prepare response headers
+        headers = {
+            "Content-Type": content_type,
+            "Accept-Ranges": "bytes"
+        }
+        
+        # Add range headers if this is a range request
+        if range_header:
+            headers["Content-Range"] = f"bytes {start_byte}-{end_byte}/{total_size}"
+            status_code = 206  # Partial Content
+        else:
+            status_code = 200  # OK
+        
+        return Response(
+            content=content,
+            status_code=status_code,
+            headers=headers
+        )
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error("File streaming failed", extra={"error": str(e)})
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to stream file"
         ) 
