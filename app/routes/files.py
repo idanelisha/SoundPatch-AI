@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from app.services.file_service import FileService
-from app.models.file import FileUploadResponse
+from app.models.file import FileUploadResponse, ZoomUploadRequest
 from app.core.logging import logger
 
 router = APIRouter(
@@ -55,4 +55,41 @@ async def upload_file(
         raise HTTPException(
             status_code=500,
             detail="Failed to upload file"
+        )
+
+@router.post("/upload-link", response_model=FileUploadResponse)
+async def upload_zoom_recording(request: ZoomUploadRequest):
+    """
+    Upload a Zoom recording link.
+    
+    Args:
+        request: Zoom upload request containing URL and title
+        
+    Returns:
+        FileUploadResponse: Information about the uploaded recording
+        
+    Raises:
+        HTTPException: If upload fails
+    """
+    try:
+        file_record = await file_service.upload_zoom_recording(request)
+        
+        # Convert to response format
+        return FileUploadResponse(
+            id=file_record.id,
+            title=file_record.title,
+            type=file_record.type,
+            status=file_record.status,
+            uploadDate=file_record.upload_date,
+            expiryDate=file_record.expiry_date,
+            transaction_id=file_record.transaction_id
+        )
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error("Zoom recording upload failed", extra={"error": str(e)})
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to process Zoom recording"
         ) 

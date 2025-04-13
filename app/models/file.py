@@ -6,6 +6,7 @@ from enum import Enum
 class FileType(str, Enum):
     AUDIO = "audio"
     VIDEO = "video"
+    ZOOM = "zoom"
 
 class FileStatus(str, Enum):
     PROCESSING = "processing"
@@ -28,4 +29,8 @@ class FileUploadResponse(BaseModel):
     status: FileStatus
     uploadDate: datetime
     expiryDate: datetime
-    transaction_id: str 
+    transaction_id: str
+
+class ZoomUploadRequest(BaseModel):
+    url: str
+    title: str 
