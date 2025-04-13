@@ -41,7 +41,7 @@ class FileService:
             transaction_id = f"tx_upload_{uuid.uuid4().hex[:8]}"
             
             # Save file to storage
-            file_path = f"{file_id}_{file.filename}"
+            file_path = f"{file_id}_original"
             await self.storage_service.upload_file(file, file_path)
             
             # Create file record
@@ -352,4 +352,77 @@ class FileService:
             raise HTTPException(
                 status_code=500,
                 detail="Failed to get file details"
+            )
+
+    async def download_file(self, file_id: str, version: str = "processed") -> tuple[bytes, str, str]:
+        """
+        Download a file by its ID.
+        
+        Args:
+            file_id: The ID of the file to download
+            version: The version of the file to download ("processed" or "original")
+            
+        Returns:
+            tuple[bytes, str, str]: The file content, content type, and filename
+            
+        Raises:
+            HTTPException: If file not found or download fails
+        """
+        try:
+            # Get file record from Redis
+            file_data = await self.redis_service.hget(self.files_key, file_id)
+            if not file_data:
+                raise HTTPException(
+                    status_code=404,
+                    detail="File not found"
+                )
+            
+            file_record = File.parse_raw(file_data)
+            
+            # Determine file path based on version
+            if version == "processed":
+                file_path = f"{file_id}_processed"
+            else:
+                file_path = f"{file_id}_original"
+            
+            # Get file content from storage
+            content = await self.storage_service.get_file_content(file_path)
+            if not content:
+                raise HTTPException(
+                    status_code=404,
+                    detail="File content not found"
+                )
+            
+            # Determine content type based on file type
+            content_type = "audio/mpeg" if file_record.type == FileType.AUDIO else "video/mp4"
+            
+            # Create filename
+            extension = ".mp3" if file_record.type == FileType.AUDIO else ".mp4"
+            filename = f"{file_record.title}{extension}"
+            
+            logger.info(
+                "File download prepared successfully",
+                extra={
+                    "file_id": file_id,
+                    "version": version,
+                    "type": file_record.type
+                }
+            )
+            
+            return content, content_type, filename
+            
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            logger.error(
+                "Failed to download file",
+                extra={
+                    "error": str(e),
+                    "file_id": file_id,
+                    "version": version
+                }
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to download file"
             ) 

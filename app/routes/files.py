@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Response
 from app.services.file_service import FileService
 from app.models.file import (
     FileUploadResponse, ZoomUploadRequest,
@@ -160,4 +160,42 @@ async def get_file_details(file_id: str):
         raise HTTPException(
             status_code=500,
             detail="Failed to get file details"
+        )
+
+@router.get("/{file_id}/download")
+async def download_file(
+    file_id: str,
+    version: str = Query("processed", description="Version of the file to download (processed or original)")
+):
+    """
+    Download a file by its ID.
+    
+    Args:
+        file_id: The ID of the file to download
+        version: The version of the file to download (processed or original)
+        
+    Returns:
+        Response: Binary file data with appropriate headers
+        
+    Raises:
+        HTTPException: If file not found or download fails
+    """
+    try:
+        content, content_type, filename = await file_service.download_file(file_id, version)
+        
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error("File download failed", extra={"error": str(e)})
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to download file"
         ) 

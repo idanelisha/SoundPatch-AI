@@ -113,4 +113,56 @@ class StorageService:
             raise HTTPException(
                 status_code=500,
                 detail="Failed to upload file"
+            )
+
+    async def get_file_content(self, file_path: str) -> Optional[bytes]:
+        """
+        Get the content of a file from storage.
+        
+        Args:
+            file_path: The path to the file (relative to storage_path)
+            
+        Returns:
+            Optional[bytes]: The file content if found, None otherwise
+            
+        Raises:
+            HTTPException: If reading fails
+        """
+        try:
+            # Create the full path
+            full_path = os.path.join(self.storage_path, file_path)
+            
+            # Check if file exists
+            if not os.path.exists(full_path):
+                logger.warning(
+                    "File not found in storage",
+                    extra={"file_path": file_path}
+                )
+                return None
+            
+            # Read the file
+            async with aiofiles.open(full_path, 'rb') as f:
+                content = await f.read()
+            
+            logger.info(
+                "File content retrieved successfully",
+                extra={
+                    "file_path": file_path,
+                    "size": len(content)
+                }
+            )
+            
+            return content
+            
+        except Exception as e:
+            logger.error(
+                "Failed to read file content",
+                extra={
+                    "error": str(e),
+                    "file_path": file_path
+                }
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to read file content"
             ) 
