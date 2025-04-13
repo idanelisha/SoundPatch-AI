@@ -6,7 +6,7 @@ from fastapi import UploadFile, HTTPException
 from app.core.config import RedisConfig, StorageConfig
 from app.models.file import (
     File, FileType, FileStatus, ZoomUploadRequest,
-    FileListItem, PaginationInfo, FileListResponse
+    FileListItem, PaginationInfo, FileListResponse, FileDetails
 )
 from app.core.logging import logger
 from app.services.storage_service import StorageService
@@ -280,4 +280,80 @@ class FileService:
             raise HTTPException(
                 status_code=500,
                 detail="Failed to list files"
+            )
+
+    async def get_file_details(self, file_id: str) -> FileDetails:
+        """
+        Get detailed information about a file.
+        
+        Args:
+            file_id: The ID of the file to get details for
+            
+        Returns:
+            FileDetails: Detailed file information
+            
+        Raises:
+            HTTPException: If file not found or other error occurs
+        """
+        try:
+            # Get file record from Redis
+            file_data = await self.redis_service.hget(self.files_key, file_id)
+            if not file_data:
+                raise HTTPException(
+                    status_code=404,
+                    detail="File not found"
+                )
+            
+            file_record = File.parse_raw(file_data)
+            
+            # Generate transaction ID for this operation
+            transaction_id = f"tx_get_file_{uuid.uuid4().hex[:8]}"
+            
+            # TODO: Get additional file details from your storage service
+            # This is where you would:
+            # 1. Get file size from storage
+            # 2. Get duration from media processing service
+            # 3. Get URLs from your CDN/storage service
+            # 4. Get description from your database
+            
+            # For now, using placeholder values
+            file_details = FileDetails(
+                id=file_record.id,
+                title=file_record.title,
+                type=file_record.type,
+                status=file_record.status,
+                uploadDate=file_record.upload_date,
+                expiryDate=file_record.expiry_date,
+                description="This is a sample description for the recording.",
+                duration="1:23:47",
+                fileSize="345.7 MB",
+                mediaUrl=f"https://storage.example.com/processed-files/{file_id}.mp4",
+                originalMediaUrl=f"https://storage.example.com/original-files/{file_id}.mp4",
+                transaction_id=transaction_id
+            )
+            
+            logger.info(
+                "File details retrieved successfully",
+                extra={
+                    "file_id": file_id,
+                    "type": file_record.type,
+                    "status": file_record.status
+                }
+            )
+            
+            return file_details
+            
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            logger.error(
+                "Failed to get file details",
+                extra={
+                    "error": str(e),
+                    "file_id": file_id
+                }
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to get file details"
             ) 

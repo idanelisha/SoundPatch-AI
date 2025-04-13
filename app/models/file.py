@@ -51,4 +51,18 @@ class PaginationInfo(BaseModel):
 
 class FileListResponse(BaseModel):
     files: List[FileListItem]
-    pagination: PaginationInfo 
+    pagination: PaginationInfo
+
+class FileDetails(BaseModel):
+    id: str
+    title: str
+    type: FileType
+    status: FileStatus
+    uploadDate: datetime
+    expiryDate: datetime
+    description: Optional[str] = None
+    duration: Optional[str] = None
+    fileSize: Optional[str] = None
+    mediaUrl: Optional[str] = None
+    originalMediaUrl: Optional[str] = None
+    transaction_id: str 

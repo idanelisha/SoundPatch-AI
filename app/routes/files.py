@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from app.services.file_service import FileService
 from app.models.file import (
     FileUploadResponse, ZoomUploadRequest,
-    FileListResponse, FileStatus
+    FileListResponse, FileStatus, FileDetails
 )
 from app.core.logging import logger
 from app.core.config import get_settings   
@@ -135,4 +135,29 @@ async def list_files(
         raise HTTPException(
             status_code=500,
             detail="Failed to list files"
+        )
+
+@router.get("/{file_id}", response_model=FileDetails)
+async def get_file_details(file_id: str):
+    """
+    Get detailed information about a file.
+    
+    Args:
+        file_id: The ID of the file to get details for
+        
+    Returns:
+        FileDetails: Detailed file information
+        
+    Raises:
+        HTTPException: If file not found or other error occurs
+    """
+    try:
+        return await file_service.get_file_details(file_id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error("Failed to get file details", extra={"error": str(e)})
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to get file details"
         ) 
