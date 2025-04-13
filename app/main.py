@@ -7,7 +7,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
-from app.routes import audio, auth, health
+from app.routes import audio, auth, files, health
 from app.core.logging import logger
 
 settings = get_settings()
@@ -39,6 +39,7 @@ def create_application() -> FastAPI:
     application.include_router(health.router, prefix="/api/v1")
     application.include_router(auth.router, prefix="/api/v1")
     application.include_router(audio.router, prefix="/api/v1")
+    application.include_router(files.router, prefix="/api/v1")
     logger.info("Routes registered successfully")
 
     @application.get("/")

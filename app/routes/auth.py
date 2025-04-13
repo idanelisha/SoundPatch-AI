@@ -1,6 +1,7 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from app.models.user import User, UserCreate, Token
+from app.models.user import User, UserBase, UserCreate, Token
 from app.services.auth_service import AuthService
 from app.dependencies.auth import get_current_user
 from app.core.exceptions import AuthenticationError
@@ -35,7 +36,13 @@ class RegisterResponse(BaseModel):
     createdAt: datetime
 
 class LoginRequest(BaseModel):
-    id_token: str
+    id_token: Optional[str] = None
+    email: str
+    password: str
+
+class LoginResponse(BaseModel):
+    token: str
+    user: UserBase
 
 @router.post("/register", response_model=RegisterResponse)
 async def register(user_data: RegisterRequest):
@@ -78,24 +85,43 @@ async def register(user_data: RegisterRequest):
             detail=str(e)
         )
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=LoginResponse)
 async def login(login_data: LoginRequest):
     """
-    Login with Firebase ID token.
+    Login with email and password or Firebase ID token.
     
     Args:
-        login_data: Login data containing Firebase ID token
+        login_data: Login data containing either Firebase ID token or email/password
         
     Returns:
-        Token: Access token for the logged-in user
+        LoginResponse: Access token and user information
         
     Raises:
         HTTPException: If login fails
     """
     try:
-        token = await auth_service.login_user(login_data.id_token)
-        logger.info("User logged in successfully")
-        return token
+        if login_data.id_token:
+            # Handle Firebase ID token login
+            token = await auth_service.login_user(login_data.id_token)
+        else:
+            # Handle email/password login
+            token = await auth_service.login_with_email_password(
+                email=login_data.email,
+                password=login_data.password
+            )
+        
+        # Get user information
+        user = await auth_service.get_current_user(login_data.id_token)
+        logger.info("User logged in successfully", extra={"user_id": user.id})
+        
+        return LoginResponse(
+            token=token.access_token,
+            user=UserBase(
+                id=user.id,
+                email=user.email,
+                full_name=user.full_name
+            )
+        )
     except Exception as e:
         logger.error("Login failed", extra={"error": str(e)})
         raise HTTPException(

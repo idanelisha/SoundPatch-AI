@@ -4,6 +4,7 @@ from typing import List, Optional
 from uuid import UUID
 
 class UserBase(BaseModel):
+    id: str
     email: EmailStr
     full_name: str
 
