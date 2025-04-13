@@ -51,5 +51,4 @@ class PaginationInfo(BaseModel):
 
 class FileListResponse(BaseModel):
     files: List[FileListItem]
-    pagination: PaginationInfo
-    transaction_id: str 
+    pagination: PaginationInfo 

@@ -172,9 +172,6 @@ class FileService:
             FileListResponse: List of files with pagination info
         """
         try:
-            # Generate transaction ID
-            transaction_id = f"tx_get_files_{uuid.uuid4().hex[:8]}"
-            
             # TODO: Replace with actual database query
             filtered_files = self.files.copy()
             
@@ -233,8 +230,7 @@ class FileService:
             
             return FileListResponse(
                 files=file_items,
-                pagination=pagination_info,
-                transaction_id=transaction_id
+                pagination=pagination_info
             )
             
         except Exception as e:
